@@ -136,6 +136,34 @@ function searchMovies(query) {
       // Task 2.2: Render the results returned from the server. Make sure to
       // include an "Add" button for each result that calls `addMovie(imdbID)` when clicked.
       // There is a second part to this task, in `addMovie`
+      if (results.length === 0) {
+          new ElementBuilder("p")
+            .text(messages.noResultsFound)
+            .appendTo(resultsDiv);
+          return;
+        }
+
+        results.forEach(movie => {
+          const container = new ElementBuilder("div")
+            .class("search-result");
+
+          // Title + Year
+          new ElementBuilder("span")
+            .text(`${movie.Title} (${movie.Year ?? "N/A"})`)
+            .appendTo(container);
+
+          // Add button
+          new ButtonBuilder("Add")
+            .onclick(() => {
+              addMovie(movie.imdbID);
+
+              // Remove this entry from the dialog after adding
+              container.element.remove();
+            })
+            .appendTo(container);
+
+          container.appendTo(resultsDiv);
+        });
 
     })
     .catch(error => {
@@ -165,9 +193,19 @@ window.onload = function () {
   function renderUserGreeting() {
     const greetingElement = document.getElementById('userGreeting');
     if (currentSession) {
-      // Task 1.2: Render a user greeting to `#userGreeting` 
-      // using `firstName`, `lastName`, and the server-provided
-      // login timestamp.
+      const { firstName, lastName, loginTime } = currentSession;
+
+    const date = new Date(loginTime);
+    const formatted = date.toLocaleString("de-DE", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    greetingElement.textContent =
+      `Hi ${firstName} ${lastName}, u last logged in at ${formatted} .`;
     } else {
       greetingElement.textContent = messages.loggedOutGreeting;
     }
@@ -212,10 +250,30 @@ window.onload = function () {
     e.preventDefault();
     const formData = new FormData(e.target);
 
-    // Task 1.1: Implement the login submit flow to call `POST /login` 
-    // with username and password, handle errors, save the response 
-    // into `currentSession`, then call `updateUI()` and `loadMovies()`.
+    const username = formData.get("username");
+    const password = formData.get("password");
 
+    fetch("/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(messages.loginFailed);
+        }
+       return response.json();
+      })
+      .then(data => {
+        currentSession = data;
+        document.getElementById('loginDialog').close();
+        updateUI();
+        loadMovies();
+      })
+      .catch(error => {
+        console.error("Login failed:", error);
+        alert(messages.loginFailed);
+      });
   });
 
   document.getElementById('cancelLogin').addEventListener('click', () => {
